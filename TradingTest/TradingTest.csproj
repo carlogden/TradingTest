@@ -136,7 +136,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Alpaca\Alpaca.Markets\Alpaca.Markets.csproj">
+    <ProjectReference Include="..\..\alpaca-trade-api-csharp\Alpaca.Markets\Alpaca.Markets.csproj">
       <Project>{076dd2d5-bca0-41ba-a553-d39c470a3573}</Project>
       <Name>Alpaca.Markets</Name>
     </ProjectReference>

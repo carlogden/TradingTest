@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.28729.10
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingTest", "TradingTest\TradingTest.csproj", "{AB49F929-FC1B-408B-96C6-43CE735599BA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Alpaca.Markets", "..\Alpaca\Alpaca.Markets\Alpaca.Markets.csproj", "{076DD2D5-BCA0-41BA-A553-D39C470A3573}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Alpaca.Markets", "..\alpaca-trade-api-csharp\Alpaca.Markets\Alpaca.Markets.csproj", "{076DD2D5-BCA0-41BA-A553-D39C470A3573}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
