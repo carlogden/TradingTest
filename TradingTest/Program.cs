@@ -4,18 +4,20 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Alpaca.Markets;
+using UsageExamples;
 
 
 namespace TradingTest
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            string API_KEY = "PKGTE1QBWLC5KS2I2DEG";
-            string API_SECRET = "DMcv5Yxk6UtuogCXIOYBxUYS2foP/Zaos1WvzHu4";
+            string API_KEY = "PKYTILJHP9H0FURKDZM1";
+            string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
             string API_URL = "https://paper-api.alpaca.markets";
-
+            
+            /*
             var alpaca = new Alpaca.Markets.RestClient(API_KEY, API_SECRET, API_URL);
             var account = alpaca.GetAccountAsync().Result;
 
@@ -30,21 +32,16 @@ namespace TradingTest
             Console.Out.WriteLine($"Asset {asset.Symbol} is tradable {asset.IsTradable} on the {asset.Exchange} exchange");
 
             var barsSets = alpaca.GetBarSetAsync(new String[] { "SPY","AMZN" }, TimeFrame.Day, 200).Result;
+            */
+            /*
             foreach(var barsSet in barsSets)
             {
                 DisplayBarsFacts(barsSet);
             }
-            //var barsArray = barsSets.ToArray();
-
-            //var bars = barsSets["SPY"].ToList();
-            //DisplayBarsFacts(barsArray[0]);
-
-            //var sma200 = bars.Average(a => a.c);
-
-
+            */
 
             var test = new MeanReversionPaperOnly();
-            //test.Run();
+            await test.Run();
         }
 
         //private static void DisplayBarsFacts(List<IAgg> bars)

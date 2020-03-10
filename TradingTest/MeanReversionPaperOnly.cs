@@ -1,45 +1,53 @@
 ﻿using Alpaca.Markets;
 using System;
-using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
-namespace TradingTest
+namespace UsageExamples
 {
-    class MeanReversionPaperOnly
+    // This version of the mean reversion example algorithm uses only API features which
+    // are available to users with a free account that can only be used for paper trading.
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    internal sealed class MeanReversionPaperOnly : IDisposable
     {
-        private string API_KEY = "PKGTE1QBWLC5KS2I2DEG";
-        private string API_SECRET = "DMcv5Yxk6UtuogCXIOYBxUYS2foP/Zaos1WvzHu4";
-        private string API_URL = "https://paper-api.alpaca.markets";
+        private string API_KEY = "PKYTILJHP9H0FURKDZM1";
+
+        private string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
 
         private string symbol = "SPY";
+
         private Decimal scale = 200;
 
-        private RestClient restClient;
+        private AlpacaTradingClient alpacaTradingClient;
+
+        private AlpacaDataClient alpacaDataClient;
 
         private Guid lastTradeId = Guid.NewGuid();
-        private List<Decimal> closingPrices = new List<Decimal>();
 
-        public void Run()
+        public async Task Run()
         {
-            restClient = new RestClient(API_KEY, API_SECRET, API_URL);
+            alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(API_KEY, new SecretKey(API_SECRET));
+
+            alpacaDataClient = Environments.Paper.GetAlpacaDataClient(API_KEY, new SecretKey(API_SECRET));
 
             // First, cancel any existing orders so they don't impact our buying power.
-            //restClient.
-            var orders = restClient.ListOrdersAsync().Result;
+            var orders = await alpacaTradingClient.ListOrdersAsync();
             foreach (var order in orders)
             {
-                restClient.DeleteOrderAsync(order.OrderId);
+                await alpacaTradingClient.DeleteOrderAsync(order.OrderId);
             }
 
             // Figure out when the market will close so we can prepare to sell beforehand.
-            var calendars = restClient.ListCalendarAsync(DateTime.Today).Result;
+            var calendars = (await alpacaTradingClient.ListCalendarAsync(DateTime.Today)).ToList();
             var calendarDate = calendars.First().TradingDate;
             var closingTime = calendars.First().TradingCloseTime;
+
             closingTime = new DateTime(calendarDate.Year, calendarDate.Month, calendarDate.Day, closingTime.Hour, closingTime.Minute, closingTime.Second);
 
             Console.WriteLine("Waiting for market open...");
-           // AwaitMarketOpen();
+            await AwaitMarketOpen();
             Console.WriteLine("Market opened.");
 
             // Check every minute for price updates.
@@ -47,29 +55,30 @@ namespace TradingTest
             while (timeUntilClose.TotalMinutes > 15)
             {
                 // Cancel old order if it's not already been filled.
-                restClient.DeleteOrderAsync(lastTradeId);
-
+                await alpacaTradingClient.DeleteOrderAsync(lastTradeId);
+                
                 // Get information about current account value.
-                var account = restClient.GetAccountAsync().Result;
+                var account = await alpacaTradingClient.GetAccountAsync();
                 Decimal buyingPower = account.BuyingPower;
-                Decimal portfolioValue = account.PortfolioValue;
+                Decimal portfolioValue = account.Equity;
 
                 // Get information about our existing position.
                 int positionQuantity = 0;
                 Decimal positionValue = 0;
                 try
                 {
-                    var currentPosition = restClient.GetPositionAsync(symbol).Result;
+                    var currentPosition = await alpacaTradingClient.GetPositionAsync(symbol);
                     positionQuantity = currentPosition.Quantity;
                     positionValue = currentPosition.MarketValue;
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     // No position exists. This exception can be safely ignored.
                 }
 
-                var barSet = restClient.GetBarSetAsync(new String[] { symbol }, TimeFrame.Minute, 20).Result;
-                var bars = barSet[symbol];
+                var barSet = await alpacaDataClient.GetBarSetAsync(new[] { symbol }, TimeFrame.Minute, 20);
+                var bars = barSet[symbol].ToList();
+
                 Decimal avg = bars.Average(item => item.Close);
                 Decimal currentPrice = bars.Last().Close;
                 Decimal diff = avg - currentPrice;
@@ -80,7 +89,7 @@ namespace TradingTest
                     if (positionQuantity > 0)
                     {
                         Console.WriteLine("Setting position to zero.");
-                        SubmitOrder(positionQuantity, currentPrice, OrderSide.Sell);
+                        await SubmitOrder(positionQuantity, currentPrice, OrderSide.Sell);
                     }
                     else
                     {
@@ -105,7 +114,7 @@ namespace TradingTest
                         }
                         int qtyToBuy = (int)(amountToAdd / currentPrice);
 
-                        SubmitOrder(qtyToBuy, currentPrice, OrderSide.Buy);
+                        await SubmitOrder(qtyToBuy, currentPrice, OrderSide.Buy);
                     }
                     else
                     {
@@ -119,29 +128,35 @@ namespace TradingTest
                             qtyToSell = positionQuantity;
                         }
 
-                        SubmitOrder(qtyToSell, currentPrice, OrderSide.Sell);
+                        await SubmitOrder(qtyToSell, currentPrice, OrderSide.Sell);
                     }
                 }
 
                 // Wait another minute.
                 Thread.Sleep(60000);
-                timeUntilClose = closingTime - DateTime.Now;
+                timeUntilClose = closingTime - DateTime.UtcNow;
             }
 
             Console.WriteLine("Market nearing close; closing position.");
-            ClosePositionAtMarket();
+            await ClosePositionAtMarket();
         }
 
-        private void AwaitMarketOpen()
+        public void Dispose()
         {
-            while (!restClient.GetClockAsync().Result.IsOpen)
+            alpacaTradingClient?.Dispose();
+            alpacaDataClient?.Dispose();
+        }
+
+        private async Task AwaitMarketOpen()
+        {
+            while (!(await alpacaTradingClient.GetClockAsync()).IsOpen)
             {
-                Thread.Sleep(60000);
+                await Task.Delay(60000);
             }
         }
 
         // Submit an order if quantity is not zero.
-        private void SubmitOrder(int quantity, Decimal price, OrderSide side)
+        private async Task SubmitOrder(int quantity, Decimal price, OrderSide side)
         {
             if (quantity == 0)
             {
@@ -149,22 +164,21 @@ namespace TradingTest
                 return;
             }
             Console.WriteLine($"Submitting {side} order for {quantity} shares at ${price}.");
-            var order = restClient.PostOrderAsync(symbol, quantity, side, OrderType.Limit, TimeInForce.Day, price).Result;
+            var order = await alpacaTradingClient.PostOrderAsync(symbol, quantity, side, OrderType.Limit, TimeInForce.Day, price);
             lastTradeId = order.OrderId;
         }
 
-        private void ClosePositionAtMarket()
+        private async Task ClosePositionAtMarket()
         {
             try
             {
-                var positionQuantity = restClient.GetPositionAsync(symbol).Result.Quantity;
-                restClient.PostOrderAsync(symbol, positionQuantity, OrderSide.Sell, OrderType.Market, TimeInForce.Day);
+                var positionQuantity = (await alpacaTradingClient.GetPositionAsync(symbol)).Quantity;
+                await alpacaTradingClient.PostOrderAsync(symbol, positionQuantity, OrderSide.Sell, OrderType.Market, TimeInForce.Day);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 // No position to exit.
             }
         }
     }
 }
- 
