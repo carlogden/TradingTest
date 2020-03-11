@@ -11,12 +11,15 @@ namespace TradingTest
 {
     class Program
     {
+        static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         static async Task Main(string[] args)
         {
             string API_KEY = "PKYTILJHP9H0FURKDZM1";
             string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
             string API_URL = "https://paper-api.alpaca.markets";
-            
+
+            logger.Info("Log initalized");
+
             /*
             var alpaca = new Alpaca.Markets.RestClient(API_KEY, API_SECRET, API_URL);
             var account = alpaca.GetAccountAsync().Result;
@@ -40,8 +43,12 @@ namespace TradingTest
             }
             */
 
-            var test = new MeanReversionPaperOnly();
-            await test.Run();
+            var scalper = new Scalper();
+            scalper.MovingAverage = 50;
+            await scalper.Run();
+            var meanRevision = new MeanReversionPaperOnly();
+            //await meanRevision.Run();
+             
         }
 
         //private static void DisplayBarsFacts(List<IAgg> bars)

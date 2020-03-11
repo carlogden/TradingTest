@@ -4,14 +4,18 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Alpaca.Markets;
+using System.Collections.Generic;
 
-namespace UsageExamples
+namespace TradingTest
 {
     // This version of the mean reversion example algorithm uses only API features which
     // are available to users with a free account that can only be used for paper trading.
     [SuppressMessage("ReSharper", "InconsistentNaming")]
-    internal sealed class MeanReversionPaperOnly : IDisposable
+    internal sealed class Scalper : IDisposable
     {
+        static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+
         private string API_KEY = "PKYTILJHP9H0FURKDZM1";
 
         private string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
@@ -25,6 +29,9 @@ namespace UsageExamples
         private AlpacaDataClient alpacaDataClient;
 
         private Guid lastTradeId = Guid.NewGuid();
+
+        public int MovingAverage = 50;
+
 
         public async Task Run()
         {
@@ -46,9 +53,9 @@ namespace UsageExamples
 
             closingTime = new DateTime(calendarDate.Year, calendarDate.Month, calendarDate.Day, closingTime.Hour, closingTime.Minute, closingTime.Second);
 
-            Console.WriteLine("Waiting for market open...");
+            logger.Info("Waiting for market open...");
             await AwaitMarketOpen();
-            Console.WriteLine("Market opened.");
+            logger.Info("Market opened.");
 
             // Check every minute for price updates.
             TimeSpan timeUntilClose = closingTime - DateTime.UtcNow;
@@ -76,13 +83,37 @@ namespace UsageExamples
                     // No position exists. This exception can be safely ignored.
                 }
 
-                var barSet = await alpacaDataClient.GetBarSetAsync(
-                    new BarSetRequest(symbol, TimeFrame.Minute) { Limit = 20 });
+                var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Minute) { Limit = MovingAverage});
                 var bars = barSet[symbol].ToList();
+                
+                var sma = CalculateClosingSMA(bars, MovingAverage);
 
                 Decimal avg = bars.Average(item => item.Close);
                 Decimal currentPrice = bars.Last().Close;
                 Decimal diff = avg - currentPrice;
+                string msg = $"{symbol} current price: {currentPrice} SMA: {sma} ";
+                var lastBarDate = bars.Last().Time.Date;
+                var currentDate = DateTime.Today;
+                if (lastBarDate == currentDate)
+                {
+                    if (currentPrice > sma)
+                    {
+                        logger.Info(msg + "we are bullish");
+                        // Console.WriteLine(msg + "we are bullish");
+                    }
+                    else
+                    {
+                        logger.Info(msg + "we are bearish");
+                        // Console.WriteLine(msg + "we are bearish");
+                    }
+                }
+                else
+                {
+                    logger.Info("Barset is invalid");
+                  
+                }
+
+                /*
 
                 if (diff <= 0)
                 {
@@ -132,7 +163,7 @@ namespace UsageExamples
                         await SubmitOrder(qtyToSell, currentPrice, OrderSide.Sell);
                     }
                 }
-
+                */
                 // Wait another minute.
                 Thread.Sleep(60000);
                 timeUntilClose = closingTime - DateTime.UtcNow;
@@ -140,6 +171,11 @@ namespace UsageExamples
 
             Console.WriteLine("Market nearing close; closing position.");
             await ClosePositionAtMarket();
+        }
+
+        private static decimal CalculateClosingSMA(IEnumerable<IAgg> barsNewestFirst, int days)
+        {
+            return barsNewestFirst.Take(days).Average(a => a.Close);
         }
 
         public void Dispose()
