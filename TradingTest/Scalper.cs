@@ -4,7 +4,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Alpaca.Markets;
 using System.Collections.Generic;
 
 namespace TradingTest
@@ -32,12 +31,21 @@ namespace TradingTest
 
         public int MovingAverage = 50;
 
+        private TradeLog tradeLog;
+        public string TradeLogsBasePath = "";
+
 
         public async Task Run()
         {
             alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(new SecretKey(API_KEY, API_SECRET));
 
             alpacaDataClient = Environments.Paper.GetAlpacaDataClient(new SecretKey(API_KEY, API_SECRET));
+
+            tradeLog = TradeLog.LoadTradeLoad(TradeLogsBasePath, symbol);
+            if (tradeLog == null)
+            {
+                tradeLog = new TradeLog() { Symbol = symbol, BasePath = TradeLogsBasePath };
+            }
 
             // First, cancel any existing orders so they don't impact our buying power.
             var orders = await alpacaTradingClient.ListOrdersAsync();
@@ -57,6 +65,8 @@ namespace TradingTest
             await AwaitMarketOpen();
             logger.Info("Market opened.");
 
+            TradeEntry trade = tradeLog.GetOpenTrade();
+            
             // Check every minute for price updates.
             TimeSpan timeUntilClose = closingTime - DateTime.UtcNow;
             while (timeUntilClose.TotalMinutes > 15)
@@ -98,13 +108,42 @@ namespace TradingTest
                 {
                     if (currentPrice > sma)
                     {
-                        logger.Info(msg + "we are bullish");
+                        if (trade == null)
+                        {
+                            trade = new TradeEntry(symbol)
+                            {
+                                OpenPrice = currentPrice,
+                                SMAAtOpen = sma                                
+                            };
+                            tradeLog.Trades.Add(trade);
+                            tradeLog.SaveTradeLog();                            
+                            logger.Info(msg + $"opening trade {currentPrice}");
+                        }
+                        else
+                        {
+                            logger.Info(msg + "holding, net open "+(currentPrice-trade.OpenPrice));
+                        }
+                        
+
                         // Console.WriteLine(msg + "we are bullish");
                     }
                     else
                     {
-                        logger.Info(msg + "we are bearish");
-                        // Console.WriteLine(msg + "we are bearish");
+                        if (trade != null)
+                        {
+                            trade.ClosePrice = currentPrice;
+                            trade.SMAAtClose = sma;
+                            tradeLog.NetProfit += trade.NetProfit;
+                            tradeLog.SaveTradeLog();
+
+                            logger.Info(msg + "we are bearish closing trade "+trade.NetProfit+" profit on trade, "+tradeLog.NetProfit+" profit on day");
+                        }
+                        else
+                        {
+                            logger.Info(msg + "we are bearish no open trade");
+                        }
+                        
+                        
                     }
                 }
                 else

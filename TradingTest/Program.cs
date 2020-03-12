@@ -42,9 +42,13 @@ namespace TradingTest
                 DisplayBarsFacts(barsSet);
             }
             */
-
-            var scalper = new Scalper();
+            
+            var scalper = new Scalper()
+            {
+                TradeLogsBasePath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+            };
             scalper.MovingAverage = 50;
+            
             await scalper.Run();
             var meanRevision = new MeanReversionPaperOnly();
             //await meanRevision.Run();
