@@ -8,18 +8,20 @@ namespace TradingTest
 {
     public class TradeEntry
     {
-        public DateTime TradeTime;
         public string Symbol;
+        public DateTime OpenTime;        
         public decimal OpenPrice;
-        public decimal ClosePrice;
         public decimal SMAAtOpen;
+
+        public DateTime CloseTime;
+        public decimal ClosePrice;        
         public decimal SMAAtClose;
         public decimal NetProfit => ClosePrice - OpenPrice;
         
         public TradeEntry(string symbol)
         {
             Symbol = symbol;
-            TradeTime = new DateTime();
+            OpenTime = DateTime.Now;
         }
     }
 }

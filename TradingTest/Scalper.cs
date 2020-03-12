@@ -133,6 +133,7 @@ namespace TradingTest
                         {
                             trade.ClosePrice = currentPrice;
                             trade.SMAAtClose = sma;
+                            trade.CloseTime = DateTime.Now;
                             tradeLog.NetProfit += trade.NetProfit;
                             tradeLog.SaveTradeLog();                           
 
