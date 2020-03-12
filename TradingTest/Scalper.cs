@@ -134,9 +134,10 @@ namespace TradingTest
                             trade.ClosePrice = currentPrice;
                             trade.SMAAtClose = sma;
                             tradeLog.NetProfit += trade.NetProfit;
-                            tradeLog.SaveTradeLog();
+                            tradeLog.SaveTradeLog();                           
 
                             logger.Info(msg + "we are bearish closing trade "+trade.NetProfit+" profit on trade, "+tradeLog.NetProfit+" profit on day");
+                            trade = null;
                         }
                         else
                         {
