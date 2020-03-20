@@ -47,12 +47,14 @@ namespace TradingTest
                 tradeLog = new TradeLog() { Symbol = symbol, BasePath = TradeLogsBasePath };
             }
 
+            /*
             // First, cancel any existing orders so they don't impact our buying power.
             var orders = await alpacaTradingClient.ListOrdersAsync();
             foreach (var order in orders)
             {
                 await alpacaTradingClient.DeleteOrderAsync(order.OrderId);
             }
+            */
 
             // Figure out when the market will close so we can prepare to sell beforehand.
             var calendars = (await alpacaTradingClient.ListCalendarAsync(DateTime.Today)).ToList();
@@ -61,15 +63,18 @@ namespace TradingTest
 
             closingTime = new DateTime(calendarDate.Year, calendarDate.Month, calendarDate.Day, closingTime.Hour, closingTime.Minute, closingTime.Second);
 
+           // var barstest = GetBarsWithRetry();
+
             logger.Info("Waiting for market open...");
             await AwaitMarketOpen();
             logger.Info("Market opened.");
-
+            await this.WaitForEnoughSMABars();
+            logger.Info("Ok lets start");
             TradeEntry trade = tradeLog.GetOpenTrade();
             
             // Check every minute for price updates.
             TimeSpan timeUntilClose = closingTime - DateTime.UtcNow;
-            while (timeUntilClose.TotalMinutes > 15)
+            while (timeUntilClose.TotalMinutes > 5)
             {
                 // Cancel old order if it's not already been filled.
                 await alpacaTradingClient.DeleteOrderAsync(lastTradeId);
@@ -82,6 +87,7 @@ namespace TradingTest
                 // Get information about our existing position.
                 int positionQuantity = 0;
                 Decimal positionValue = 0;
+                /*
                 try
                 {
                     var currentPosition = await alpacaTradingClient.GetPositionAsync(symbol);
@@ -92,8 +98,9 @@ namespace TradingTest
                 {
                     // No position exists. This exception can be safely ignored.
                 }
-
-                var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Minute) { Limit = MovingAverage});
+                */
+                // var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Minute) { Limit = MovingAverage});
+                var barSet = await GetBarsWithRetry();
                 var bars = barSet[symbol].ToList();
                 
                 var sma = CalculateClosingSMA(bars, MovingAverage);
@@ -211,8 +218,72 @@ namespace TradingTest
             }
 
             Console.WriteLine("Market nearing close; closing position.");
-            await ClosePositionAtMarket();
+            //await ClosePositionAtMarket();
+            trade = tradeLog.GetOpenTrade();
+            if (trade != null)
+            {
+                var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Minute) { Limit = MovingAverage });
+                var bars = barSet[symbol].ToList();
+
+                var sma = CalculateClosingSMA(bars, MovingAverage);
+
+                Decimal avg = bars.Average(item => item.Close);
+                Decimal currentPrice = bars.Last().Close;
+                trade.ClosePrice = currentPrice;
+                trade.SMAAtClose = sma;
+                trade.CloseTime = DateTime.Now;
+                tradeLog.NetProfit += trade.NetProfit;
+                tradeLog.SaveTradeLog();
+
+                logger.Info("closing for the day " + trade.NetProfit + " profit on trade, " + tradeLog.NetProfit + " profit on day");
+                trade = null;
+            }
         }
+
+        private async Task<IReadOnlyDictionary<String, IReadOnlyList<IAgg>>> GetBarsWithRetry(int tries = 0)
+        {
+
+            var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Minute) { Limit = MovingAverage });
+
+            var bars = barSet[symbol].ToList();
+
+            var lastBar = bars.Last();
+            if (IsBarForDate(lastBar, DateTime.Today))
+            {
+                return barSet;
+            }
+            else
+            {
+                if(tries < 10)
+                {
+                    logger.Info($"bars are invalid retrying getbars [{tries + 1}]");
+                    await Task.Delay(5000);
+                    return await GetBarsWithRetry(tries+1);
+                }
+                else
+                {
+                    logger.Error($"maximum retres hit, giving up");
+                    return barSet;
+                }
+            }
+
+
+        }
+
+        private bool IsBarForDate(IAgg bar, DateTime date)
+        {
+            var barDate = bar.Time.Date;
+            if (barDate == date)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        
+                
 
         private static decimal CalculateClosingSMA(IEnumerable<IAgg> barsNewestFirst, int days)
         {
@@ -233,6 +304,19 @@ namespace TradingTest
             }
         }
 
+        private async Task WaitForEnoughSMABars()
+        {
+            DateTime enoughTimePast = DateTime.Today;
+            enoughTimePast = enoughTimePast.AddHours(6);
+            enoughTimePast = enoughTimePast.AddMinutes(30 + MovingAverage);
+            while(DateTime.Now < enoughTimePast)
+            {
+                TimeSpan minutesTillStart = enoughTimePast.Subtract(DateTime.Now);
+                logger.Info($"{(int) minutesTillStart.TotalMinutes} minutes till we have enough bars");
+                await Task.Delay(60000);
+            }
+
+        }
         // Submit an order if quantity is not zero.
         private async Task SubmitOrder(int quantity, Decimal price, OrderSide side)
         {
