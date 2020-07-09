@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingTest", "TradingTest\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Alpaca.Markets", "..\alpaca-trade-api-csharp\Alpaca.Markets\Alpaca.Markets.csproj", "{076DD2D5-BCA0-41BA-A553-D39C470A3573}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingTestTests", "TradingTestTests\TradingTestTests.csproj", "{8186D453-1108-457E-9823-D4CA0F23C239}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{076DD2D5-BCA0-41BA-A553-D39C470A3573}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{076DD2D5-BCA0-41BA-A553-D39C470A3573}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{076DD2D5-BCA0-41BA-A553-D39C470A3573}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8186D453-1108-457E-9823-D4CA0F23C239}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8186D453-1108-457E-9823-D4CA0F23C239}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8186D453-1108-457E-9823-D4CA0F23C239}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8186D453-1108-457E-9823-D4CA0F23C239}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

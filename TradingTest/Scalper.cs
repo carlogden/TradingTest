@@ -63,7 +63,7 @@ namespace TradingTest
 
             closingTime = new DateTime(calendarDate.Year, calendarDate.Month, calendarDate.Day, closingTime.Hour, closingTime.Minute, closingTime.Second);
 
-           // var barstest = GetBarsWithRetry();
+            var barstest = GetBarsWithRetry();
 
             logger.Info("Waiting for market open...");
             await AwaitMarketOpen();
@@ -243,7 +243,7 @@ namespace TradingTest
         private async Task<IReadOnlyDictionary<String, IReadOnlyList<IAgg>>> GetBarsWithRetry(int tries = 0)
         {
 
-            var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Minute) { Limit = MovingAverage });
+            var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbol, TimeFrame.Day) { Limit = MovingAverage });
 
             var bars = barSet[symbol].ToList();
 

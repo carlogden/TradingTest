@@ -42,6 +42,8 @@ namespace TradingTest
                 DisplayBarsFacts(barsSet);
             }
             */
+            var stockData = new StockDataModel();
+            await stockData.Run();
             
             var scalper = new Scalper()
             {
@@ -49,9 +51,10 @@ namespace TradingTest
             };
             scalper.MovingAverage = 50;
             
-            await scalper.Run();
-            var meanRevision = new MeanReversionPaperOnly();
+           // await scalper.Run();
+            //var meanRevision = new MeanReversionPaperOnly();
             //await meanRevision.Run();
+           
              
         }
 
