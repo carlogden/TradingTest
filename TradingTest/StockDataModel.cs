@@ -72,7 +72,7 @@ namespace TradingTest
             }
             logger.Info("After");
             */
-            while (timeUntilClose.TotalMinutes > 5)
+            while (timeUntilClose.TotalMinutes > 1)
             {
                 var today = await GetBarsWithRetry(symbols, 1);
 
