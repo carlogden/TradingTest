@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace TradingTest
 {
@@ -34,11 +36,15 @@ namespace TradingTest
 
         public async Task Run()
         {
+            
+            Stocks.Add(new Stock { Symbol = "AAPL" });            
             Stocks.Add(new Stock { Symbol = "SPY" });
-            Stocks.Add(new Stock { Symbol = "AAPL" });
-            Stocks.Add(new Stock { Symbol = "TWLO" });
             Stocks.Add(new Stock { Symbol = "TSLA" });
-
+            Stocks.Add(new Stock { Symbol = "TWLO" });
+            Stocks.Add(new Stock { Symbol = "ZS" });
+            Stocks.Add(new Stock { Symbol = "CRWD" });
+            Stocks.Add(new Stock { Symbol = "FTNT" });
+            
             alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(new SecretKey(API_KEY, API_SECRET));
 
             alpacaDataClient = Environments.Paper.GetAlpacaDataClient(new SecretKey(API_KEY, API_SECRET));
@@ -60,6 +66,7 @@ namespace TradingTest
                 var bars = historicalData[stock.Symbol];
                 stock.InitData(bars);
             }
+            SaveModel(@"c:\temp\stockdatamodelcache.json");
 
             logger.Info("After");
             /*
@@ -76,90 +83,32 @@ namespace TradingTest
             {
                 var today = await GetBarsWithRetry(symbols, 1);
 
-                foreach (var stock in Stocks)
+                foreach (var stock in Stocks.OrderBy(s => s.Symbol))
                 {
                     var bars = today[stock.Symbol];
                     stock.AddTick(bars);
-                    logger.Info($"{stock.Symbol} price {stock.TodayData.Close} estimated volumne percent {stock.VolumeEstimate.VolumePercent *100}");
+                    logger.Info($"{stock.Symbol} price {stock.TodayData.Close}  avol[{InMillions(stock.VolumnAverage)}] vol[{InMillions(stock.VolumnToday)}] evol[{InMillions(stock.VolumeEstimate.Volume)}] per [{stock.VolumeEstimate.VolumePercent * 100}%]");
                 }
-                
+                SaveModel(@"c:\temp\stockdatamodel_full.json");
                 Thread.Sleep(60000);
                 timeUntilClose = closingTime - DateTime.UtcNow;
-            }
+            }            
+        }
 
-                /*
-                while (timeUntilClose.TotalMinutes > 5)
-                {
-                    var barSet = await GetBarsWithRetry();
-                    var bars = barSet[symbol].ToList();
+        public void SaveModel(string path)
+        {
+            string json = JsonConvert.SerializeObject(Stocks, Formatting.Indented);
+            //string path = basePath.EndsWith("\\") ? basePath : basePath + "\\";
+           // path += "stockdatamodel.json";
+            File.WriteAllText($"{path}", json);
+        }
 
-                    var sma = CalculateClosingSMA(bars, MovingAverage);
-
-                    Decimal avg = bars.Average(item => item.Close);
-                    Decimal currentPrice = bars.Last().Close;
-                    Decimal diff = avg - currentPrice;
-                    string msg = $"{symbol} current price: {currentPrice} SMA: {sma} ";
-                    var lastBarDate = bars.Last().Time.Date;
-                    var currentDate = DateTime.Today;
-                    if (lastBarDate == currentDate)
-                    {
-                        if (currentPrice > sma)
-                        {
-                            if (trade == null)
-                            {
-                                trade = new TradeEntry(symbol)
-                                {
-                                    OpenPrice = currentPrice,
-                                    SMAAtOpen = sma                                
-                                };
-                                tradeLog.Trades.Add(trade);
-                                tradeLog.SaveTradeLog();                            
-                                logger.Info(msg + $"opening trade {currentPrice}");
-                            }
-                            else
-                            {
-                                logger.Info(msg + "holding, net open "+(currentPrice-trade.OpenPrice));
-                            }
-
-
-                            // Console.WriteLine(msg + "we are bullish");
-                        }
-                        else
-                        {
-                            if (trade != null)
-                            {
-                                trade.ClosePrice = currentPrice;
-                                trade.SMAAtClose = sma;
-                                trade.CloseTime = DateTime.Now;
-                                tradeLog.NetProfit += trade.NetProfit;
-                                tradeLog.SaveTradeLog();                           
-
-                                logger.Info(msg + "we are bearish closing trade "+trade.NetProfit+" profit on trade, "+tradeLog.NetProfit+" profit on day");
-                                trade = null;
-                            }
-                            else
-                            {
-                                logger.Info(msg + "we are bearish no open trade");
-                            }
-
-
-                        }
-                    }
-                    else
-                    {
-                        logger.Info("Barset is invalid");
-
-                    }
-
-
-                    // Wait another minute.
-                 //   Thread.Sleep(60000);
-                  //  timeUntilClose = closingTime - DateTime.UtcNow;
-                }
-                */
-                // Console.WriteLine("Market nearing close; closing position.");
-                //await ClosePositionAtMarket();            
-            }
+        private string InMillions(long volume)
+        {
+            //number 24,601,236
+            double volInMill = Math.Round(volume * 0.000001, 2);
+            return volInMill.ToString() + "M";
+        }
 
         private async Task<IReadOnlyDictionary<String, IReadOnlyList<IAgg>>> GetBarsWithRetry(IEnumerable<string> symbols,int? numberOfDays, int tries = 0)
         {

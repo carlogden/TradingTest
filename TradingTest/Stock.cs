@@ -14,7 +14,7 @@ namespace TradingTest
         public long VolumnAverage { get; set; }
 
         public long VolumnToday { get; protected set; }
-        protected List<IAgg> HistoricalData { get; set; }
+        public List<IAgg> HistoricalData { get; set; }
         public IAgg TodayData { get; protected set; }
         public VolumeEstimate VolumeEstimate { get; protected set; }
 
