@@ -135,6 +135,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Stock.cs" />
+    <Compile Include="StockBar.cs" />
     <Compile Include="StockDataModel.cs" />
     <Compile Include="Scalper.cs" />
     <Compile Include="MeanReversionPaperOnly.cs" />

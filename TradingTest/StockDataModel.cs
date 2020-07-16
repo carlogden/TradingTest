@@ -7,31 +7,72 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.IO;
+using Newtonsoft.Json.Converters;
 
 namespace TradingTest
 {
-    // This version of the mean reversion example algorithm uses only API features which
-    // are available to users with a free account that can only be used for paper trading.
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
-    internal sealed class StockDataModel : IDisposable
+    public class StockDataModel : IDisposable
     {
         static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-        private string API_KEY = "PKYTILJHP9H0FURKDZM1";
+        private const string API_KEY = "PKYTILJHP9H0FURKDZM1";
 
-        private string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
+        private const string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
 
-        private List<Stock> Stocks = new List<Stock>();
+        public static List<Stock> Stocks { get; protected set; }
+        private static string DataPath = @"c:\temp\";
+        public const int DaysToAverage = 20;
+        
+        public IEnumerable<string> Symbols
+        {
+            get => Stocks.Select(s => s.Symbol);
+        }
 
-        //private Decimal scale = 200;
+        private static AlpacaTradingClient _alpacaTradingClient;
+        private AlpacaTradingClient alpacaTradingClient { 
+            get
+            {
+                if (_alpacaTradingClient == null)
+                {
+                    _alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(new SecretKey(API_KEY, API_SECRET));
+                }
+                return _alpacaTradingClient;
+            }
 
-        private AlpacaTradingClient alpacaTradingClient;
+            set { _alpacaTradingClient = value; }
+        }
 
-        private AlpacaDataClient alpacaDataClient;
+        private static AlpacaDataClient _alpacaDataClient;
+        private AlpacaDataClient alpacaDataClient
+        {
+            get
+            {
+                if (_alpacaDataClient == null)
+                {
+                    _alpacaDataClient = Environments.Paper.GetAlpacaDataClient(new SecretKey(API_KEY, API_SECRET));
+                }
+                return _alpacaDataClient;
+            }
+
+            set { _alpacaDataClient = value; }
+        }
+
+        
+
 
         private Guid lastTradeId = Guid.NewGuid();
 
         public int MovingAverage = 50;
+
+        public StockDataModel()
+        {
+            if (Stocks == null)
+            {
+                Stocks = new List<Stock>();
+                //alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(new SecretKey(API_KEY, API_SECRET));
+                //alpacaDataClient = Environments.Paper.GetAlpacaDataClient(new SecretKey(API_KEY, API_SECRET));
+            }
+        }
 
 
         public async Task Run()
@@ -45,9 +86,9 @@ namespace TradingTest
             Stocks.Add(new Stock { Symbol = "CRWD" });
             Stocks.Add(new Stock { Symbol = "FTNT" });
             
-            alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(new SecretKey(API_KEY, API_SECRET));
+            //alpacaTradingClient = Environments.Paper.GetAlpacaTradingClient(new SecretKey(API_KEY, API_SECRET));
 
-            alpacaDataClient = Environments.Paper.GetAlpacaDataClient(new SecretKey(API_KEY, API_SECRET));
+            //alpacaDataClient = Environments.Paper.GetAlpacaDataClient(new SecretKey(API_KEY, API_SECRET));
 
             // Figure out when the market will close so we can prepare to sell beforehand.
             var calendars = (await alpacaTradingClient.ListCalendarAsync(DateTime.Today)).ToList();
@@ -57,31 +98,13 @@ namespace TradingTest
             closingTime = new DateTime(calendarDate.Year, calendarDate.Month, calendarDate.Day, closingTime.Hour, closingTime.Minute, closingTime.Second);
 
             TimeSpan timeUntilClose = closingTime - DateTime.UtcNow;
-            IEnumerable<string> symbols = Stocks.Select(s => s.Symbol);
-            //var historicalData = await GetBarsWithRetry(symbols, 20);
-            var historicalData = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbols, TimeFrame.Day) { Limit = 21 });
-
-            foreach (var stock in Stocks)
-            {
-                var bars = historicalData[stock.Symbol];
-                stock.InitData(bars);
-            }
-            SaveModel(@"c:\temp\stockdatamodelcache.json");
+            
 
             logger.Info("After");
-            /*
-            var today = await GetBarsWithRetry(symbols, 1);
-
-            foreach (var stock in Stocks)
-            {
-                var bars = today[stock.Symbol];
-                stock.AddTick(bars);
-            }
-            logger.Info("After");
-            */
+           
             while (timeUntilClose.TotalMinutes > 1)
             {
-                var today = await GetBarsWithRetry(symbols, 1);
+                var today = await GetBarsWithRetry(Symbols, 1);
 
                 foreach (var stock in Stocks.OrderBy(s => s.Symbol))
                 {
@@ -94,6 +117,65 @@ namespace TradingTest
                 timeUntilClose = closingTime - DateTime.UtcNow;
             }            
         }
+
+        public void AddStock(string ticker)
+        {
+            if (!Stocks.Any(s => s.Symbol.Equals(ticker)))
+            {
+                Stocks.Add(new Stock { Symbol = ticker });
+            }
+        }
+
+        public async Task LoadHistoricalData()
+        {
+            LoadModel();
+            if (!IsHistoricalDataUpToDate())
+            {
+                var adc = alpacaDataClient;
+                var historicalData = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(Symbols, TimeFrame.Day) { Limit = DaysToAverage+1 });
+
+                foreach (var stock in Stocks)
+                {
+                    var bars = historicalData[stock.Symbol];
+                    stock.InitData(bars);
+                }
+                SaveModel(@"c:\temp\stockdatamodelcache.json");
+            }
+        }
+
+        public void SetStockListForTesting(List<Stock> stocks)
+        {
+            Stocks = stocks;
+        }
+
+        public bool IsHistoricalDataUpToDate()
+        {
+            if (Stocks.Count() == 0)
+            {
+                return false;
+            }
+            if (Stocks[0].HistoricalData == null || Stocks[0].HistoricalData.Count() == 0)
+            {
+                return false;
+            }
+            
+            return true;
+        }
+
+        public void LoadModel()
+        {
+            string path = $"{DataPath}stockdatamodelcache.json";
+            if (File.Exists(path))
+            {
+                string json = File.ReadAllText(path);
+                Stocks = JsonConvert.DeserializeObject<List<Stock>>(json);
+            }
+            else
+            {
+                Stocks = new List<Stock>();
+            }
+        }
+       
 
         public void SaveModel(string path)
         {

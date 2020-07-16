@@ -43,7 +43,10 @@ namespace TradingTest
             }
             */
             var stockData = new StockDataModel();
-            await stockData.Run();
+            //await stockData.Run();
+            stockData.AddStock("SPY");
+            stockData.AddStock("QQQ");
+            await stockData.LoadHistoricalData();
             
             var scalper = new Scalper()
             {

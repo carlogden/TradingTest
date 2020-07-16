@@ -14,13 +14,14 @@ namespace TradingTest
         public long VolumnAverage { get; set; }
 
         public long VolumnToday { get; protected set; }
-        public List<IAgg> HistoricalData { get; set; }
-        public IAgg TodayData { get; protected set; }
+        //public List<JsonBarAgg> HistoricalData { get; set; } //{Alpaca.Markets.JsonBarAgg}
+        public List<StockBar> HistoricalData { get; set; } = new List<StockBar>();
+        public StockBar TodayData { get; protected set; }
         public VolumeEstimate VolumeEstimate { get; protected set; }
 
         public void AddTick(IReadOnlyList<IAgg> data)
         {
-            TodayData = data[0];
+            TodayData = StockBar.LoadFromIAgg(data[0]);
             Price = TodayData.Close;
             VolumnToday = TodayData.Volume;
             VolumeEstimate = GetVolumeEstimate(VolumnAverage, VolumnToday, MinutesOpen(DateTime.Now.AddHours(3)));
@@ -64,7 +65,11 @@ namespace TradingTest
         public void InitData(IReadOnlyList<IAgg> data)
         {
             var dataNotToday = data.Take(data.Count() - 1);
-            HistoricalData = dataNotToday.ToList();
+            HistoricalData = new List<StockBar>();
+            foreach(var barAgg in data)
+            {
+                HistoricalData.Add(StockBar.LoadFromIAgg(barAgg));
+            }
             VolumnAverage = (int) HistoricalData.Average(d => d.Volume);
         }
 
