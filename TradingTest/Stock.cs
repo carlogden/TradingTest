@@ -11,22 +11,47 @@ namespace TradingTest
     {
         public string Symbol { get; set; }
         public decimal Price { get; set; }
-        public long VolumnAverage { get; set; }
+        public string PriceFormated => Stock.FormatMoney(Price);
 
-        public long VolumnToday { get; protected set; }
+        public long VolumeAverage { get; set; }
+        public string VolumeAverageFormated => Stock.FormatVolume(VolumeAverage);
+
+        public DateTime LastUpdated { get; set; }
+
+        public long VolumeToday { get; set; }
+        public string VolumeTodayFormated => Stock.FormatVolume(VolumeToday);
         //public List<JsonBarAgg> HistoricalData { get; set; } //{Alpaca.Markets.JsonBarAgg}
         public List<StockBar> HistoricalData { get; set; } = new List<StockBar>();
-        public StockBar TodayData { get; protected set; }
-        public VolumeEstimate VolumeEstimate { get; protected set; }
+        public StockBar TodayData { get; set; }
+        public VolumeEstimate VolumeEstimate { get; set; }
 
-        public void AddTick(IReadOnlyList<IAgg> data)
+
+        public static string FormatVolume(long volume)
         {
-            TodayData = StockBar.LoadFromIAgg(data[0]);
-            Price = TodayData.Close;
-            VolumnToday = TodayData.Volume;
-            VolumeEstimate = GetVolumeEstimate(VolumnAverage, VolumnToday, MinutesOpen(DateTime.Now.AddHours(3)));
+            double volInMillions = Math.Round((double)volume * 0.000001,2);
+            return $"{volInMillions}M";            
         }
 
+        public static string FormatPercent(double percent)
+        {
+            double volInMillions = Math.Round(percent * 100.0, 2);
+            return $"{volInMillions}%";
+        }
+        public static string FormatMoney(decimal percent)
+        {
+            return percent.ToString("C");
+        }
+
+        public void AddTick(IAgg data)
+        {
+            TodayData = StockBar.LoadFromIAgg(data);
+            TodayData.Time = DateTime.Now;
+            LastUpdated = TodayData.Time;
+            Price = TodayData.Close;
+            VolumeToday = TodayData.Volume;
+            VolumeEstimate = GetVolumeEstimate(VolumeAverage, VolumeToday, MinutesOpen(DateTime.Now));
+        }
+        
         public static VolumeEstimate GetVolumeEstimate(long averageVolume, long volumeToday, int minutesOpen)
         {
             if (minutesOpen <= 0)
@@ -52,7 +77,7 @@ namespace TradingTest
 
         public static int MinutesOpen(DateTime asOfTime)
         {
-            DateTime marketOpen = new DateTime(asOfTime.Year, asOfTime.Month, asOfTime.Day, 9, 30, 0);
+            DateTime marketOpen = new DateTime(asOfTime.Year, asOfTime.Month, asOfTime.Day, 6, 30, 0);
             double timeDif = asOfTime.Subtract(marketOpen).TotalMinutes;
             int timeDifSeconds = (int)Math.Round(timeDif);
             if (timeDifSeconds >= 0)
@@ -62,15 +87,15 @@ namespace TradingTest
             return 0;
         }
 
-        public void InitData(IReadOnlyList<IAgg> data)
+        public void InitData(IEnumerable<IAgg> data)
         {
-            var dataNotToday = data.Take(data.Count() - 1);
+            //var dataNotToday = data.Take(data.Count() - 1);
             HistoricalData = new List<StockBar>();
             foreach(var barAgg in data)
             {
                 HistoricalData.Add(StockBar.LoadFromIAgg(barAgg));
             }
-            VolumnAverage = (int) HistoricalData.Average(d => d.Volume);
+            VolumeAverage = (int) HistoricalData.Average(d => d.Volume);
         }
 
 

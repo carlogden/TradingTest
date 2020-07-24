@@ -1,0 +1,41 @@
+﻿table.stock-grid {
+    border-collapse: collapse;
+}
+table, th, td {
+    border: 1px solid red;
+    padding: 5px 5px 5px 5px;
+}
+.open{
+    color: green;
+}
+.closed{
+    color: red;
+}
+
+#summary{
+    padding-bottom: 25px;
+}
+td.classification {
+    text-align: center;
+}
+ 
+td.extreme {
+    background-color: red;
+    color: white
+}
+td.dryup {
+    background-color: lightgray;    
+}
+td.light {
+    background-color: yellow;
+}
+td.average {
+    background-color: orange;
+}
+td.high {
+    background-color: mediumpurple;
+    color: white
+}
+td.number, td.percentage {
+    text-align: right;
+}

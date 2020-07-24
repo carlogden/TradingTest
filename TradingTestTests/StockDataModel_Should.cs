@@ -32,8 +32,38 @@ namespace TradingTestTests
             }
 
             stockDataModel.IsHistoricalDataUpToDate().Should().Be(expectedValue);
-
-
         }
+
+        [Theory]
+        [InlineData("07/22/2020 07:47:16", "07/21/2020")]
+        [InlineData("07/22/2020 17:47:16", "07/22/2020")]
+        [InlineData("07/19/2020 07:47:16", "07/17/2020")]
+        [InlineData("07/18/2020 07:47:16", "07/17/2020")]
+        public void GetLastCompletedTradingDate_Should(string asOfTestTimeSrc, string expectedDateSrc)
+        {
+            StockDataModel stockDataModel = new StockDataModel();
+            DateTime asOfTestTime = DateTime.Parse(asOfTestTimeSrc);
+            DateTime expectedDate = DateTime.Parse(expectedDateSrc);           
+
+            var lastCompletedTradeDate = stockDataModel.GetLastCompletedTradingDate(asOfTestTime);
+            lastCompletedTradeDate.Should().Be(expectedDate);
+        }
+
+        [Theory]
+        [InlineData("07/18/2020 07:47:16", false)]
+        [InlineData("07/19/2020 17:47:16", false)]
+        [InlineData("07/22/2020 4:47:16", false)]
+        [InlineData("07/22/2020 18:47:16", false)]
+        [InlineData("07/22/2020 11:47:16", true)]
+        public void IsMarketOpen_Should(string asOfTestTimeSrc, bool expectedResult)
+        {
+           // StockDataModel stockDataModel = new StockDataModel();
+            DateTime asOfTestTime = DateTime.Parse(asOfTestTimeSrc);
+            
+            var lastCompletedTradeDate = StockDataModel.IsMarketOpen(asOfTestTime);
+            lastCompletedTradeDate.Should().Be(expectedResult);
+        }
+
+        
     }
 }

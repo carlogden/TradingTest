@@ -20,7 +20,8 @@ namespace TradingTest
         private const string API_SECRET = "U3BVINkOTMMENV37CNwT3RY0iyC89fHAS1OPd4H9";
 
         public static List<Stock> Stocks { get; protected set; }
-        private static string DataPath = @"c:\temp\";
+        private static string DataPath = @"c:\temp\";        
+
         public const int DaysToAverage = 20;
         
         public IEnumerable<string> Symbols
@@ -29,7 +30,7 @@ namespace TradingTest
         }
 
         private static AlpacaTradingClient _alpacaTradingClient;
-        private AlpacaTradingClient alpacaTradingClient { 
+        public AlpacaTradingClient alpacaTradingClient { 
             get
             {
                 if (_alpacaTradingClient == null)
@@ -39,11 +40,11 @@ namespace TradingTest
                 return _alpacaTradingClient;
             }
 
-            set { _alpacaTradingClient = value; }
+            protected set { _alpacaTradingClient = value; }
         }
 
         private static AlpacaDataClient _alpacaDataClient;
-        private AlpacaDataClient alpacaDataClient
+        public AlpacaDataClient alpacaDataClient
         {
             get
             {
@@ -54,7 +55,7 @@ namespace TradingTest
                 return _alpacaDataClient;
             }
 
-            set { _alpacaDataClient = value; }
+            protected set { _alpacaDataClient = value; }
         }
 
         
@@ -104,43 +105,202 @@ namespace TradingTest
            
             while (timeUntilClose.TotalMinutes > 1)
             {
-                var today = await GetBarsWithRetry(Symbols, 1);
-
-                foreach (var stock in Stocks.OrderBy(s => s.Symbol))
-                {
-                    var bars = today[stock.Symbol];
-                    stock.AddTick(bars);
-                    logger.Info($"{stock.Symbol} price {stock.TodayData.Close}  avol[{InMillions(stock.VolumnAverage)}] vol[{InMillions(stock.VolumnToday)}] evol[{InMillions(stock.VolumeEstimate.Volume)}] per [{stock.VolumeEstimate.VolumePercent * 100}%]");
-                }
-                SaveModel(@"c:\temp\stockdatamodel_full.json");
+                await LoadTodaysBarAsync();                
                 Thread.Sleep(60000);
                 timeUntilClose = closingTime - DateTime.UtcNow;
             }            
         }
 
+        public async Task LoadTodaysBarAsyncIfNeeded(int secondsOld = 60)
+        {
+            bool loadBars = false;
+            if (StockDataModel.Stocks[0].TodayData == null)
+            {
+                loadBars = true;
+            }
+            if (IsMarketOpen())
+            {
+
+                DateTime lastUpdateTime = StockDataModel.Stocks[0].TodayData.Time;
+                lastUpdateTime = lastUpdateTime.AddSeconds(secondsOld);
+                if (lastUpdateTime < DateTime.Now)
+                {
+                    loadBars = true;
+                }
+
+            }
+            if (loadBars)
+            {
+                await LoadTodaysBarAsync();
+            }
+        }
+
+        public StockDataModelSummary GetSummary()
+        {
+            StockDataModelSummary summary = new StockDataModelSummary();
+            var stock = GetStockOldestUpdated();
+            summary.LastUpdated = stock.LastUpdated;
+            summary.MinutesOpen = Stock.MinutesOpen(DateTime.Now);
+            summary.EstimateConfidence = stock.VolumeEstimate.Confidence;
+            summary.EstimateConfidenceFormated = stock.VolumeEstimate.ConfidenceFormated;
+            return summary;
+        }
+
+        public bool IsMarketOpen()
+        {
+            return IsMarketOpen(DateTime.Now);
+        }
+        public static bool IsMarketOpen(DateTime timeToEvaluate)
+        {
+            if (timeToEvaluate.DayOfWeek == DayOfWeek.Saturday || timeToEvaluate.DayOfWeek == DayOfWeek.Sunday)
+            {
+                return false;
+            }
+            DateTime marketOpen = timeToEvaluate.Date.AddHours(6).AddSeconds(30);
+            if(timeToEvaluate < marketOpen)
+            {
+                return false;
+            }
+            DateTime marketClose = timeToEvaluate.Date.AddHours(13);
+            if(timeToEvaluate > marketClose)
+            {
+                return false;
+            }
+            return true;
+
+        }
+
+        public async Task LoadTodaysBarAsync()
+        {
+            var today = await GetBarsWithRetry(Symbols, 1);
+
+            foreach (var stock in Stocks.OrderBy(s => s.Symbol))
+            {
+                var bars = today[stock.Symbol];
+                stock.AddTick(bars[0]);
+                logger.Info($"{stock.Symbol} price {stock.TodayData.Close}  avol[{InMillions(stock.VolumeAverage)}] vol[{InMillions(stock.VolumeToday)}] evol[{InMillions(stock.VolumeEstimate.Volume)}] per [{stock.VolumeEstimate.VolumePercent * 100}%]");
+            }
+            SaveModel(@"c:\temp\stockdatamodel_full.json");
+
+        }
+
+        public void RemoveStock(string ticker)
+        {
+            Stock stock = GetStockInModel(ticker);
+            if (stock != null)
+            {
+                Stocks.Remove(stock);
+                SaveModel();
+            }
+        }
         public void AddStock(string ticker)
         {
-            if (!Stocks.Any(s => s.Symbol.Equals(ticker)))
+            if (ticker == null)
+            {
+                return;
+            }
+            if (!IsStockInModel(ticker))
             {
                 Stocks.Add(new Stock { Symbol = ticker });
+            }        
+        }
+
+        public async Task AddStockWithVerify(string ticker)
+        {
+            if (ticker == null)
+            {
+                return;
             }
+            if (!IsStockInModel(ticker))
+            {
+                var asset = await GetAssetAsync(ticker);
+                if (asset != null)
+                {
+                    AddStock(asset.Symbol);
+                }
+            }
+        }
+
+        public Task<IAsset> GetAssetAsync(string ticker)
+        {
+            return  alpacaTradingClient.GetAssetAsync(ticker.ToUpper());
+        }
+
+        public bool IsStockInModel(string ticker)
+        {
+            if (Stocks.Any(s => s.Symbol.Equals(ticker.ToUpper())))
+            {
+                return true;
+            }
+            return false;
+        }
+        public Stock GetStockInModel(string ticker)
+        {
+            return Stocks.FirstOrDefault(s => s.Symbol.Equals(ticker.ToUpper()));
+        }
+
+        public Stock GetStockOldestUpdated()
+        {
+            return Stocks.OrderByDescending(s => s.LastUpdated).FirstOrDefault(); ;
         }
 
         public async Task LoadHistoricalData()
         {
-            LoadModel();
+            if (Stocks.Count == 0)
+            {
+                LoadModel();
+            }
             if (!IsHistoricalDataUpToDate())
             {
-                var adc = alpacaDataClient;
+                if (Stocks.Count == 0)
+                {
+                    AddStock("SPY");
+                    AddStock("BNTX");
+                    AddStock("SPOT");
+                }
+                await LoadHistoricalDataForSymbols(Symbols);
+                /*
                 var historicalData = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(Symbols, TimeFrame.Day) { Limit = DaysToAverage+1 });
-
+                DateTime lastTradingDate = GetLastCompletedTradingDate();
                 foreach (var stock in Stocks)
                 {
-                    var bars = historicalData[stock.Symbol];
+                    var bars = historicalData[stock.Symbol].Where(d=> d.Time.Date <= lastTradingDate.Date);
                     stock.InitData(bars);
                 }
-                SaveModel(@"c:\temp\stockdatamodelcache.json");
+                SaveModel(@"c:\temp\stockdatamodel_full.json");
+                */
             }
+        }
+
+        public async Task AddStockAndLoad(string ticker)
+        {
+            if (!IsStockInModel(ticker))
+            {
+                await AddStockWithVerify(ticker);
+                await LoadHistoricalDataForSymbols(new string[] { ticker });
+                Stocks = Stocks.OrderBy(s => s.Symbol).ToList();
+            }
+        }
+
+        private async Task LoadHistoricalDataForSymbols(IEnumerable<string> symbols)
+        {
+            var historicalData = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbols, TimeFrame.Day) { Limit = DaysToAverage + 1 });
+            DateTime lastTradingDate = GetLastCompletedTradingDate();
+            foreach (var symbol in symbols)
+            {
+                Stock stock = Stocks.FirstOrDefault(s => s.Symbol.Equals(symbol));
+                if (stock != null)
+                {
+                    var bars = historicalData[stock.Symbol].Where(d => d.Time.Date <= lastTradingDate.Date);
+                    stock.InitData(bars);
+                    var todayBar = historicalData[stock.Symbol].FirstOrDefault(d => d.Time.Date == lastTradingDate.Date);
+                    if (todayBar != null)
+                    {
+                        stock.AddTick(todayBar);
+                    }
+                }
+            }
+            SaveModel(@"c:\temp\stockdatamodel_full.json");
         }
 
         public void SetStockListForTesting(List<Stock> stocks)
@@ -158,31 +318,74 @@ namespace TradingTest
             {
                 return false;
             }
+            DateTime lastUpdateTime = StockDataModel.Stocks[0].HistoricalData.Last().Time;
+            if (IsDateLastTradingDay(lastUpdateTime))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool IsDateLastTradingDay(DateTime dateToTest)
+        {
+            DateTime lastCompletedTradeDate = GetLastCompletedTradingDate();
+            if(dateToTest.Date == lastCompletedTradeDate.Date)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public DateTime GetLastCompletedTradingDate()
+        {
+            return GetLastCompletedTradingDate(DateTime.Now);
+        }
+        public DateTime GetLastCompletedTradingDate(DateTime asOfDateTime)
+        {
+            DateTime lastTradingDate = asOfDateTime;
+            if(lastTradingDate.Hour < 13)
+            {
+                lastTradingDate = lastTradingDate.AddDays(-1);
+            }
             
-            return true;
+            if(lastTradingDate.DayOfWeek == DayOfWeek.Saturday)
+            {
+                lastTradingDate = lastTradingDate.AddDays(-1);
+            }
+
+            if (lastTradingDate.DayOfWeek == DayOfWeek.Sunday)
+            {
+                lastTradingDate = lastTradingDate.AddDays(-2);
+            }
+            
+            return lastTradingDate.Date;
         }
 
         public void LoadModel()
         {
-            string path = $"{DataPath}stockdatamodelcache.json";
+            //string path = $"{DataPath}stockdatamodelcache.json";
+            string path = $"{DataPath}stockdatamodel_full.json";
+            
             if (File.Exists(path))
             {
                 string json = File.ReadAllText(path);
-                Stocks = JsonConvert.DeserializeObject<List<Stock>>(json);
+                Stocks = JsonConvert.DeserializeObject<List<Stock>>(json).OrderBy(s=> s.Symbol).ToList();
             }
             else
             {
-                Stocks = new List<Stock>();
+                //Stocks = new List<Stock>();
             }
         }
        
 
-        public void SaveModel(string path)
+        public void SaveModel(string path=null)
         {
-            string json = JsonConvert.SerializeObject(Stocks, Formatting.Indented);
+            string pathToWrite = path ?? $"{DataPath}stockdatamodel_full.json";
+            string json = JsonConvert.SerializeObject(Stocks.OrderBy(s=> s.Symbol), Formatting.Indented);
             //string path = basePath.EndsWith("\\") ? basePath : basePath + "\\";
            // path += "stockdatamodel.json";
-            File.WriteAllText($"{path}", json);
+            File.WriteAllText(pathToWrite, json);
         }
 
         private string InMillions(long volume)
@@ -192,7 +395,7 @@ namespace TradingTest
             return volInMill.ToString() + "M";
         }
 
-        private async Task<IReadOnlyDictionary<String, IReadOnlyList<IAgg>>> GetBarsWithRetry(IEnumerable<string> symbols,int? numberOfDays, int tries = 0)
+        public async Task<IReadOnlyDictionary<String, IReadOnlyList<IAgg>>> GetBarsWithRetry(IEnumerable<string> symbols,int? numberOfDays, int tries = 0)
         {
 
             var barSet = await alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbols, TimeFrame.Day) { Limit = numberOfDays });

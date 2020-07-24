@@ -141,6 +141,7 @@
     <Compile Include="MeanReversionPaperOnly.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StockDataModelSummary.cs" />
     <Compile Include="TradeEntry.cs" />
     <Compile Include="TradeLog.cs" />
     <Compile Include="VolumeEstimate.cs" />

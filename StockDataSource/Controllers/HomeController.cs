@@ -31,9 +31,30 @@ namespace StockDataSource.Controllers
         public async Task<IActionResult> StockGridAsync()
         {
             StockDataModel stockDataModel = new TradingTest.StockDataModel();
-            stockDataModel.AddStock("SPY");
+
             await stockDataModel.LoadHistoricalData();
-            ViewBag.Carl = "ogden1";
+
+            string action = (string)Request.Query["action"] ?? String.Empty;
+            string symbol = Request.Query["symbol"];
+
+            if (action.Equals("addsymbol") && symbol!=null){
+                await stockDataModel.AddStockAndLoad(symbol);
+            }
+
+            if (action.Equals("removesymbol") && symbol != null)
+            {
+                stockDataModel.RemoveStock(symbol);
+            }
+
+
+            await stockDataModel.LoadTodaysBarAsyncIfNeeded();
+            //ViewBag.Carl = "ogden1";
+            ViewBag.stockDataModel = stockDataModel;
+            ViewBag.Summary = stockDataModel.GetSummary();
+            //ViewBag.stocks = StockDataModel.Stocks;
+            ViewBag.Stocks = StockDataModel.Stocks;
+            //StockGrid stockGrid = new StockGrid();
+            //stockGrid.Stocks = StockDataModel.Stocks; 
             return View();
         }
 

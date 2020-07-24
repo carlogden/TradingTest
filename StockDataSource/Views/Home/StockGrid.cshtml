@@ -1,10 +1,66 @@
-﻿
+﻿<link rel="stylesheet" href="~/css/stockgrid.css" type="text/css" />
+
 @{
     ViewData["Title"] = "StockGrid";
 }
 
-<h1>StockGrid1</h1>
-<h2>[@ViewData["carl"]]</h2>
-<h2>[@ViewBag.Carl]</h2>
+<h1>StockGrid</h1>
+@if (ViewBag.stockDataModel.IsMarketOpen())
+{
+    <h2 class="open">Market is Open</h2>
+    <div id="summary">
+        <table>
+            <tr>
+                <td>Mintues Open</td>
+                <td>Last Updated</td>
+                <td>Esitmate Confidence</td>                
+            </tr>
+
+            <td>@ViewBag.Summary.MinutesOpen</td>
+            <td>@ViewBag.Summary.LastUpdated.ToString()</td>
+            <td>@ViewBag.Summary.EstimateConfidenceFormated</td>
+        </table>
+    </div>
+}
+else
+{
+    <h2 class="closed">Market is Closed</h2>
+}
+
+<form method="get">
+    <label for="symbol">Add Symbol</label>
+    <input type="text" name="symbol" />
+    <input type="hidden" name="action" value="addsymbol" />
+    <input type="submit" value="Submit">
+</form>
+
+
+<table class="stock-grid">
+    <tr>
+        <td>Symbol</td>
+        <td>Price</td>
+        <td>Volumne Average</td>
+        <td>Volumne Today</td>
+        <td>Volumne Estimate</td>
+        <td>Volumne Estimate Percent</td>
+        <td>Classification</td>
+        <td>Remove</td>
+    </tr>
+    @foreach (var stock in ViewBag.Stocks)
+    {
+<tr>
+    <td>@stock.Symbol</td>
+    <td class="number">@stock.PriceFormated</td>
+    <td class="number">@stock.VolumeAverageFormated</td>
+    <td class="number">@stock.VolumeTodayFormated</td>
+    <td class="number">@stock.VolumeEstimate.VolumeFormated</td>
+    <td class="percentage">@stock.VolumeEstimate.VolumePercentFormated</td>
+    <td class="classification @stock.VolumeEstimate.Classification.ToLower()">@stock.VolumeEstimate.Classification</td>
+    <td class="action"><a href="?action=removesymbol&symbol=@stock.Symbol">Remove</a></td>
+
+</tr>
+    }
+</table>
+
 
 

@@ -42,23 +42,66 @@ namespace TradingTest
                 DisplayBarsFacts(barsSet);
             }
             */
+
+            // await RunStockDataModel();
+            /* 
+             var scalper = new Scalper()
+             {
+                 TradeLogsBasePath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+             };
+             scalper.MovingAverage = 50;
+
+             await scalper.Run();
+             */
+
+            await RunTask();
+            //var meanRevision = new MeanReversionPaperOnly();
+            //await meanRevision.Run();
+        }
+
+        private static async Task RunTask()
+        {
+            StockDataModel stockDataModel = new StockDataModel();
+            var alpaca = stockDataModel.alpacaTradingClient;
+            var account = alpaca.GetAccountAsync().Result;
+            string[] symbols = { "SPY" ,"BNTX"};
+            //{d7947b70-cf3c-4209-b072-4689e7a635de}
+
+            //var createResults = alpaca.CreateWatchListAsync("carl", symbols).Result;
+            //var watch = alpaca.GetWatchListByNameAsync("carl").Result;
+            //var updated = alpaca.UpdateWatchListByIdAsync(watch.WatchListId,"carl",symbols).Result;
+            //var watchList = alpaca.ListWatchListsAsync().Result;
+            
+            //Console.Out.WriteLine($"Account is {account.Status} buying power {account.BuyingPower.ToString("c")} {account.Currency}");
+
+            var asset = alpaca.GetAssetAsync("SPY").Result;
+            
+            int numberOfDays = 10;
+            var barSet = await stockDataModel.alpacaDataClient.GetBarSetAsync(new BarSetRequest(symbols, TimeFrame.Hour) { Limit = numberOfDays });
+            
+            /*
+            Console.Out.WriteLine($"Asset {asset.Symbol} is tradable {asset.IsTradable} on the {asset.Exchange} exchange");
+
+            asset = alpaca.GetAssetAsync("AMZN").Result;
+
+            Console.Out.WriteLine($"Asset {asset.Symbol} is tradable {asset.IsTradable} on the {asset.Exchange} exchange");
+            */
+            //var barsSets = alpaca.GetBarSetAsync(new String[] { "SPY", "AMZN" }, TimeFrame.Day, 200).Result;
+            /*
+            foreach(var barsSet in barsSets)
+            {
+                DisplayBarsFacts(barsSet);
+            }
+            */
+        }
+
+        private static async Task RunStockDataModel()
+        {
             var stockData = new StockDataModel();
             //await stockData.Run();
             stockData.AddStock("SPY");
             stockData.AddStock("QQQ");
             await stockData.LoadHistoricalData();
-            
-            var scalper = new Scalper()
-            {
-                TradeLogsBasePath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-            };
-            scalper.MovingAverage = 50;
-            
-           // await scalper.Run();
-            //var meanRevision = new MeanReversionPaperOnly();
-            //await meanRevision.Run();
-           
-             
         }
 
         //private static void DisplayBarsFacts(List<IAgg> bars)
