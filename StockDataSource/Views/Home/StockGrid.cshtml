@@ -3,8 +3,19 @@
 @{
     ViewData["Title"] = "StockGrid";
 }
+@section Scripts {
+<script>
+    $( document ).ready(function() {
+        console.log("ready!");
+        $('input[name = "symbol"]').focus();
+        setTimeout(function () {
+            console.log('reloading');
+            window.location.reload(1);
+        }, 60000);
+    });
+</script>
+}
 
-<h1>StockGrid</h1>
 @if (ViewBag.stockDataModel.IsMarketOpen())
 {
     <h2 class="open">Market is Open</h2>
