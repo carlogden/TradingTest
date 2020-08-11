@@ -31,7 +31,7 @@ namespace StockDataSource.Controllers
         public async Task<IActionResult> StockGridAsync()
         {
             StockDataModel stockDataModel = new TradingTest.StockDataModel();
-
+            var t = await stockDataModel.alpacaTradingClient.GetClockAsync();
             await stockDataModel.LoadHistoricalData();
 
             string action = (string)Request.Query["action"] ?? String.Empty;
