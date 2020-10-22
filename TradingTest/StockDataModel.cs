@@ -110,7 +110,7 @@ namespace TradingTest
                 timeUntilClose = closingTime - DateTime.UtcNow;
             }            
         }
-
+        
         public async Task LoadTodaysBarAsyncIfNeeded(int secondsOld = 60)
         {
             bool loadBars = false;
@@ -156,8 +156,10 @@ namespace TradingTest
             {
                 return false;
             }
-            DateTime marketOpen = timeToEvaluate.Date.AddHours(6).AddSeconds(30);
-            if(timeToEvaluate < marketOpen)
+            
+            DateTime marketOpen = timeToEvaluate.Date.AddHours(6).AddMinutes(30);
+            
+            if (timeToEvaluate < marketOpen)
             {
                 return false;
             }
