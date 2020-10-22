@@ -7,11 +7,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using StockDataSource.Models;
 using TradingTest;
+using NLog;
 
 namespace StockDataSource.Controllers
 {
     public class HomeController : Controller
     {
+        static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         private readonly ILogger<HomeController> _logger;        
 
         public HomeController(ILogger<HomeController> logger)
@@ -27,6 +29,48 @@ namespace StockDataSource.Controllers
         public IActionResult Privacy()
         {
             return View();
+        }
+        public async Task<IActionResult> StockDataRequest()
+        {   //symbol=MSFT&target=price
+            string symbol = Request.Query["symbol"];
+            string target = Request.Query["target"];
+            if (String.IsNullOrEmpty(symbol))
+            {
+                return Content("Error missing symbol");
+            }
+            if (String.IsNullOrEmpty(target))
+            {
+                return Content("Error missing target");
+            }
+            symbol = symbol.ToUpper();
+            
+            StockDataModel stockDataModel = new TradingTest.StockDataModel();
+            
+            await stockDataModel.LoadHistoricalData();
+            await stockDataModel.LoadTodaysBarAsyncIfNeeded();
+            
+            var stock = stockDataModel.GetStockInModel(symbol);
+            string result = "";
+            if (stock == null)
+            {
+                await stockDataModel.AddStockAndLoad(symbol);
+                stock = stockDataModel.GetStockInModel(symbol);
+                if (stock == null)
+                {
+                    result = "STOCK_NOT_FOUND";
+                    logger.Info($"{symbol} {target} {result}");
+                    return Content(result);
+                }                
+            }
+            if (target.Equals("price"))
+            {
+                result = stock.Price.ToString();
+            }
+            var remoteIpAddress = Request.HttpContext.Connection.RemoteIpAddress;
+            logger.Info($"{symbol} {target} {result} {remoteIpAddress}");
+            return Content(result);
+            
+            
         }
         public async Task<IActionResult> StockGridAsync()
         {
@@ -45,7 +89,6 @@ namespace StockDataSource.Controllers
             {
                 stockDataModel.RemoveStock(symbol);
             }
-
 
             await stockDataModel.LoadTodaysBarAsyncIfNeeded();
             //ViewBag.Carl = "ogden1";
